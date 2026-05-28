@@ -485,60 +485,59 @@ fn test_emergency_withdraw_non_admin_fails() {
 #[test]
 fn test_reentrancy_guard_emergency_withdraw() {
     use crate::security::reentrancy_guard::ReentrancyGuard;
-    let (env, cid, _client, admin) = new_env();
-    // Manually set the reentrancy lock then attempt the call
+    let (env, cid, client, admin) = new_env();
+    // Set the global reentrancy lock as if we're mid-execution
     env.as_contract(&cid, || {
-        ReentrancyGuard::execute(&env, &admin, "outer", || {
-            let client = MarketplaceSettlementClient::new(&env, &cid);
-            let reason = Bytes::from_slice(&env, b"test");
-            let result = client.try_emergency_withdraw(&1u64, &reason, &admin);
-            assert!(result.is_err());
-            Ok(())
-        })
-        .unwrap();
+        env.storage().instance().set(&soroban_sdk::symbol_short!("reentrant"), &true);
     });
+    let reason = Bytes::from_slice(&env, b"test");
+    let result = client.try_emergency_withdraw(&1u64, &reason, &admin);
+    assert!(result.is_err());
+    // Verify it's specifically ReentrancyDetected
+    if let Err(Ok(e)) = result {
+        let err: crate::error::SettlementError = e.into();
+        assert_eq!(err, crate::error::SettlementError::ReentrancyDetected);
+    }
 }
 
 #[test]
 fn test_reentrancy_guard_update_fee_config() {
-    use crate::security::reentrancy_guard::ReentrancyGuard;
     use crate::types::FeeConfig;
-    let (env, cid, _client, admin) = new_env();
+    let (env, cid, client, admin) = new_env();
     env.as_contract(&cid, || {
-        ReentrancyGuard::execute(&env, &admin, "outer", || {
-            let client = MarketplaceSettlementClient::new(&env, &cid);
-            let cfg = FeeConfig {
-                platform_fee_bps: 300,
-                minimum_fee: 500,
-                maximum_fee: 2_000_000,
-                fee_recipient: admin.clone(),
-                dynamic_fee_enabled: false,
-                volume_discounts: soroban_sdk::Vec::new(&env),
-                vip_exemptions: soroban_sdk::Vec::new(&env),
-            };
-            let result = client.try_update_fee_config(&cfg, &admin);
-            assert!(result.is_err());
-            Ok(())
-        })
-        .unwrap();
+        env.storage().instance().set(&soroban_sdk::symbol_short!("reentrant"), &true);
     });
+    let cfg = FeeConfig {
+        platform_fee_bps: 300,
+        minimum_fee: 500,
+        maximum_fee: 2_000_000,
+        fee_recipient: admin.clone(),
+        dynamic_fee_enabled: false,
+        volume_discounts: soroban_sdk::Vec::new(&env),
+        vip_exemptions: soroban_sdk::Vec::new(&env),
+    };
+    let result = client.try_update_fee_config(&cfg, &admin);
+    assert!(result.is_err());
+    if let Err(Ok(e)) = result {
+        let err: crate::error::SettlementError = e.into();
+        assert_eq!(err, crate::error::SettlementError::ReentrancyDetected);
+    }
 }
 
 #[test]
 fn test_reentrancy_guard_withdraw_platform_fees() {
-    use crate::security::reentrancy_guard::ReentrancyGuard;
-    let (env, cid, _client, admin) = new_env();
+    let (env, cid, client, admin) = new_env();
     let asset = mk_asset(&env);
     let recipient = Address::generate(&env);
     env.as_contract(&cid, || {
-        ReentrancyGuard::execute(&env, &admin, "outer", || {
-            let client = MarketplaceSettlementClient::new(&env, &cid);
-            let result = client.try_withdraw_platform_fees(&asset, &recipient, &admin);
-            assert!(result.is_err());
-            Ok(())
-        })
-        .unwrap();
+        env.storage().instance().set(&soroban_sdk::symbol_short!("reentrant"), &true);
     });
+    let result = client.try_withdraw_platform_fees(&asset, &recipient, &admin);
+    assert!(result.is_err());
+    if let Err(Ok(e)) = result {
+        let err: crate::error::SettlementError = e.into();
+        assert_eq!(err, crate::error::SettlementError::ReentrancyDetected);
+    }
 }
 
 // ─── Commit-Reveal ───────────────────────────────────────────────────────────
