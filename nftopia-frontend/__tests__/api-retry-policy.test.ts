@@ -33,6 +33,10 @@ describe("API Auto-Retry Policy Engine", () => {
     jest.useRealTimers();
   });
 
+  // Helper utility to flush microtask cycles in Jest's fake timer environment
+  const flushMicrotasks = () =>
+    new Promise(jest.requireActual("timers").setImmediate);
+
   it("should instantly return data payloads on an immediate HTTP 200 success resolution", async () => {
     const operationMock = jest
       .fn()
@@ -47,7 +51,7 @@ describe("API Auto-Retry Policy Engine", () => {
     expect(operationMock).toHaveBeenCalledTimes(1);
   });
 
-  it("should transparently recover if a failure occurs initially but resolves on a subsequent retry retry", async () => {
+  it("should transparently recover if a failure occurs initially but resolves on a subsequent retry", async () => {
     const operationMock = jest
       .fn()
       .mockRejectedValueOnce(new Error("Transient Gateway Timeout 504"))
@@ -58,8 +62,14 @@ describe("API Auto-Retry Policy Engine", () => {
       delayMs: 100,
     });
 
-    // Fast-forward the backoff timers
+    // 1. Give the async function cycle time to evaluate the first failure and enter its setTimeout block
+    await flushMicrotasks();
+
+    // 2. Fast-forward the backoff timers
     jest.advanceTimersByTime(100);
+
+    // 3. Drain the microtask queue to allow the resolved setTimeout promise to wake up the function loop
+    await flushMicrotasks();
 
     const result = await promise;
 
@@ -77,13 +87,25 @@ describe("API Auto-Retry Policy Engine", () => {
       delayMs: 150,
     });
 
-    // Cycle through internal timers to flush any scheduled execution blocks
-    jest.advanceTimersByTime(150);
-    jest.advanceTimersByTime(150);
-
-    await expect(promise).rejects.toThrow(
+    // Bind the rejection expectation first so Jest intercepts the error
+    const assertionPromise = expect(promise).rejects.toThrow(
       "Persistent Fatal Infrastructure Failure",
     );
+
+    // Step through iteration 1 -> 2
+    await flushMicrotasks();
+    jest.advanceTimersByTime(150);
+
+    // Step through iteration 2 -> 3
+    await flushMicrotasks();
+    jest.advanceTimersByTime(150);
+
+    // Final flush to resolve the exhausted loop rejection
+    await flushMicrotasks();
+
+    // Await the assertion itself to conclude the test safely
+    await assertionPromise;
+
     expect(operationMock).toHaveBeenCalledTimes(3);
   });
 });
