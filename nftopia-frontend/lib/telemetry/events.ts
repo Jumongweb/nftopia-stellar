@@ -1,6 +1,12 @@
+  //
 // Canonical event name constants and union
 
 export const EVENT_NAMES = {
+    walletConnectModalClosed: "wallet_connect_modal_closed",
+    walletSessionRehydrateStarted: "wallet_session_rehydrate_started",
+    walletSessionRehydrateSucceeded: "wallet_session_rehydrate_succeeded",
+    walletSessionRehydrateFailed: "wallet_session_rehydrate_failed",
+    walletProviderStateChanged: "wallet_provider_state_changed",
   walletConnectModalOpened: "wallet_connect_modal_opened",
   walletConnectProviderSelected: "wallet_connect_provider_selected",
   walletConnectSubmitted: "wallet_connect_submitted",

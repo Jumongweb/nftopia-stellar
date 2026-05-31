@@ -2,34 +2,65 @@ import { TelemetryEventName } from "./events";
 
 export interface TelemetryPayloadMap {
   wallet_connect_modal_opened: {
-    surface: "modal" | "header" | "settings";
+    surface: "modal";
+    trigger_source: "header_button" | "cta" | "forced_prompt" | "other";
+  };
+  wallet_connect_modal_closed: {
+    close_reason: "backdrop_click" | "escape_key" | "close_button" | "connect_success" | "route_change";
   };
   wallet_connect_provider_selected: {
-    provider: "freighter" | "albedo" | "walletconnect";
-    surface: "modal" | "header" | "settings";
+    provider: "freighter" | "albedo" | "walletconnect" | "unknown";
+    provider_available: boolean;
   };
   wallet_connect_submitted: {
-    provider: "freighter" | "albedo" | "walletconnect";
-    surface: "modal" | "header" | "settings";
+    provider: "freighter" | "albedo" | "walletconnect" | "unknown";
+    surface: "modal";
+    attempt_id: string;
   };
   wallet_connect_succeeded: {
-    provider: "freighter" | "albedo" | "walletconnect";
+    provider: "freighter" | "albedo" | "walletconnect" | "unknown";
     latency_ms: number;
+    attempt_id: string;
+    network: "public" | "testnet" | "unknown";
+    connected_via: "fresh_connect" | "session_rehydrate";
   };
   wallet_connect_failed: {
-    provider: "freighter" | "albedo" | "walletconnect";
+    provider: "freighter" | "albedo" | "walletconnect" | "unknown";
+    attempt_id: string;
+    latency_ms: number;
     error_code: string;
-    latency_ms?: number;
+    is_retryable: boolean;
   };
   wallet_disconnect_clicked: {
-    provider: "freighter" | "albedo" | "walletconnect";
+    provider: "freighter" | "albedo" | "walletconnect" | "unknown";
+    surface: "wallet_dropdown" | "user_menu" | "settings";
   };
   wallet_disconnect_succeeded: {
-    provider: "freighter" | "albedo" | "walletconnect";
+    provider: "freighter" | "albedo" | "walletconnect" | "unknown";
+    latency_ms: number;
+    initiated_by: "user" | "provider_event" | "rehydrate_check";
   };
   wallet_disconnect_failed: {
-    provider: "freighter" | "albedo" | "walletconnect";
+    provider: "freighter" | "albedo" | "walletconnect" | "unknown";
+    latency_ms: number;
     error_code: string;
+  };
+  wallet_session_rehydrate_started: {
+    provider: "freighter" | "albedo" | "walletconnect" | "unknown";
+  };
+  wallet_session_rehydrate_succeeded: {
+    provider: "freighter" | "albedo" | "walletconnect" | "unknown";
+    latency_ms: number;
+  };
+  wallet_session_rehydrate_failed: {
+    provider: "freighter" | "albedo" | "walletconnect" | "unknown";
+    error_code: string;
+    forced_disconnect: boolean;
+  };
+  wallet_provider_state_changed: {
+    provider: "freighter" | "albedo" | "walletconnect" | "unknown";
+    change_type: "account_changed" | "network_changed";
+    outcome: "updated" | "disconnected";
   };
 
   auth_login_submitted: {

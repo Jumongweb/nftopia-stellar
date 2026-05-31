@@ -11,6 +11,46 @@ export interface TelemetryEventCatalogEntry {
 }
 
 export const TELEMETRY_EVENT_CATALOG: Record<TelemetryEventName, TelemetryEventCatalogEntry> = {
+  wallet_connect_modal_closed: {
+    name: EVENT_NAMES.walletConnectModalClosed,
+    category: "wallet",
+    description: "Wallet connect modal closed by user",
+    version: 1,
+    owner: "wallet",
+    status: "active",
+  },
+  wallet_session_rehydrate_started: {
+    name: EVENT_NAMES.walletSessionRehydrateStarted,
+    category: "wallet",
+    description: "Wallet session rehydrate started",
+    version: 1,
+    owner: "wallet",
+    status: "active",
+  },
+  wallet_session_rehydrate_succeeded: {
+    name: EVENT_NAMES.walletSessionRehydrateSucceeded,
+    category: "wallet",
+    description: "Wallet session rehydrate succeeded",
+    version: 1,
+    owner: "wallet",
+    status: "active",
+  },
+  wallet_session_rehydrate_failed: {
+    name: EVENT_NAMES.walletSessionRehydrateFailed,
+    category: "wallet",
+    description: "Wallet session rehydrate failed",
+    version: 1,
+    owner: "wallet",
+    status: "active",
+  },
+  wallet_provider_state_changed: {
+    name: EVENT_NAMES.walletProviderStateChanged,
+    category: "wallet",
+    description: "Wallet provider state changed (account/network)",
+    version: 1,
+    owner: "wallet",
+    status: "active",
+  },
   wallet_connect_modal_opened: {
     name: EVENT_NAMES.walletConnectModalOpened,
     category: "wallet",

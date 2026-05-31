@@ -1,5 +1,6 @@
 import { TelemetryAdapter } from "./base";
 import { getTelemetryConfig } from "../config";
+import type { EnrichedTelemetryEvent } from "../context/types";
 
 const debugLog = (...args: unknown[]) => {
   if (getTelemetryConfig().debug) {
@@ -10,7 +11,8 @@ const debugLog = (...args: unknown[]) => {
 
 export const noopAdapter: TelemetryAdapter = {
   init: () => debugLog("init called"),
-  track: (eventName, payload) => debugLog("track", eventName, payload),
+  track: (eventName, payload: EnrichedTelemetryEvent<Record<string, unknown>>) =>
+    debugLog("track", eventName, payload),
   identify: (userId, traits) => debugLog("identify", userId, traits),
   reset: () => debugLog("reset called"),
 };

@@ -12,6 +12,8 @@ import { useToast } from "@/lib/stores";
 import { Button } from "@/components/ui/button";
 import { emitCtaClicked, CTA_IDS, CTA_PLACEMENTS } from "@/lib/telemetry/navigation-instrumentation";
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownSeparator } from "@/components/ui/dropdown";
+import { telemetry } from "@/lib/telemetry";
+import { EVENT_NAMES } from "@/lib/telemetry/events";
 
 interface WalletConnectorProps {
   forceVisible?: boolean;
@@ -118,7 +120,14 @@ export function WalletConnector({ forceVisible = false, fullWidth = false }: Wal
         <DropdownSeparator />
 
         <DropdownItem
-          onClick={() => disconnect()}
+          onClick={() => {
+            // Emit wallet_disconnect_clicked event with privacy-safe payload
+            telemetry.track(EVENT_NAMES.walletDisconnectClicked, {
+              provider: provider || "unknown",
+              surface: "wallet_dropdown",
+            });
+            disconnect();
+          }}
           className="text-red-400 hover:bg-red-500/10"
         >
           <LogOut className="h-4 w-4" aria-hidden="true" />

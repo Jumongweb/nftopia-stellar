@@ -1,5 +1,6 @@
 import { TelemetryAdapter } from "./base";
 import { getTelemetryConfig } from "../config";
+import type { EnrichedTelemetryEvent } from "../context/types";
 
 // Placeholder for PostHog SDK type
 type PostHogType = {
@@ -44,9 +45,18 @@ export const posthogAdapter: TelemetryAdapter = {
       }
     }
   },
-  track(eventName, payload) {
+  track(eventName, payload: EnrichedTelemetryEvent<Record<string, unknown>>) {
     if (!initialized || !posthog) return;
-    safe(() => posthog!.capture(eventName, payload));
+    // Flatten enriched event: merge context and payload
+    let flatPayload: Record<string, unknown> = {};
+    if (payload && typeof payload === "object" && "context" in payload && "payload" in payload) {
+      const enriched = payload as any;
+      // Optionally prefix context fields to avoid collisions
+      flatPayload = { ...enriched.context, ...enriched.payload };
+    } else {
+      flatPayload = payload || {};
+    }
+    safe(() => posthog!.capture(eventName, flatPayload));
   },
   identify(userId, traits) {
     if (!initialized || !posthog) return;

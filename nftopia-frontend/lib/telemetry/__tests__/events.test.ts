@@ -24,6 +24,7 @@ it("every event in EVENT_NAMES exists in TelemetryPayloadMap", () => {
   type PayloadKeys = keyof TelemetryPayloadMap;
   const payloadKeys: string[] = [
     "wallet_connect_modal_opened",
+    "wallet_connect_modal_closed",
     "wallet_connect_provider_selected",
     "wallet_connect_submitted",
     "wallet_connect_succeeded",
@@ -31,6 +32,10 @@ it("every event in EVENT_NAMES exists in TelemetryPayloadMap", () => {
     "wallet_disconnect_clicked",
     "wallet_disconnect_succeeded",
     "wallet_disconnect_failed",
+    "wallet_session_rehydrate_started",
+    "wallet_session_rehydrate_succeeded",
+    "wallet_session_rehydrate_failed",
+    "wallet_provider_state_changed",
     "auth_login_submitted",
     "auth_login_succeeded",
     "auth_login_failed",
@@ -49,7 +54,6 @@ it("every event in EVENT_NAMES exists in TelemetryPayloadMap", () => {
     "cta_clicked",
     "nav_item_clicked",
     "section_viewed",
-    // Add experiment events
     "experiment_exposed",
     "experiment_interaction",
     "experiment_conversion",
@@ -70,10 +74,11 @@ test("buildTelemetryEvent enforces payload type", () => {
     buildTelemetryEvent("wallet_connect_submitted", {
       provider: "freighter",
       surface: "modal",
+      attempt_id: "test-attempt-id",
     })
   ).toEqual({
     eventName: "wallet_connect_submitted",
-    payload: { provider: "freighter", surface: "modal" },
+    payload: { provider: "freighter", surface: "modal", attempt_id: "test-attempt-id" },
   });
   // TypeScript compile-time test (uncomment to check):
   // buildTelemetryEvent("wallet_connect_submitted", { foo: "bar" }); // Should error if uncommented
