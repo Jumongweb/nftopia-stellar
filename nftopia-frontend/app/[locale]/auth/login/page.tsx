@@ -4,75 +4,54 @@ import { CircuitBackground } from "@/components/circuit-background";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/stores/auth-store";
+import { useAuthStore } from "@/lib/stores/auth-store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useStellarWallet } from "@/components/wallet/hooks/useStellarWallet";
 import { useStellarAuth } from "@/components/wallet/hooks/useStellarAuth";
 import { WalletModal } from "@/components/wallet/WalletModal";
 import { WalletNetworkStatus } from "@/components/wallet/WalletNetworkStatus";
 import { defaultNetwork } from "@/lib/stellar/client";
-import { getValidationFieldMessage } from "@/utils/fetchUtils";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { loginSchema, LoginFormData } from "@/lib/validation/auth";
+import { mapServerError } from "@/lib/errors/serverErrorMapper";
 import {
-  KeyRound,
-  LogIn,
-  Wallet,
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  ChevronRight,
-  AlertTriangle,
+  LogIn, Wallet, Mail, Lock, Eye, EyeOff, ChevronRight,
 } from "lucide-react";
 import { OptimizedImage } from "@/components/image";
 import Link from "next/link";
-import React, { useState, useRef } from "react";
-// Telemetry
-import { authInstrumentation } from "@/lib/telemetry/auth-instrumentation";
+import { useState } from "react";
 
 type AuthMode = "wallet" | "email";
 
 export default function LoginPage() {
   const { t, locale } = useTranslation();
+  const { loading: emailLoading, error: emailError, clearError: clearEmailError } = useAuth();
+  const { emailLogin } = useAuthStore();
 
-  // Integrated hooks from main branch
   const {
-    loading: emailLoading,
-    error: emailStoreError,
-    clearError: clearEmailError,
-    emailLogin,
-  } = useAuth();
-
-  // Stellar wallet state hooks
-  const {
-    connected,
-    address,
-    provider,
-    connecting,
-    error: walletError,
-    connect,
-    disconnect,
-    clearError: clearWalletError,
+    connected, address, provider, connecting,
+    error: walletError, disconnect, clearError: clearWalletError,
   } = useStellarWallet();
 
   const {
-    loading: authLoading,
-    error: authError,
-    authenticateWithWallet,
-    clearError: clearAuthError,
+    loading: authLoading, error: authError,
+    authenticateWithWallet, clearError: clearAuthError,
   } = useStellarAuth();
 
-  // UI
   const [mode, setMode] = useState<AuthMode>("wallet");
   const [walletModalOpen, setWalletModalOpen] = useState(false);
-  const [challengeRequested, setChallengeRequested] = useState(false);
-  // Telemetry states
-  const attemptIdRef = useRef<string | null>(null);
-  const startMsRef = useRef<number>(0);
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [localError, setLocalError] = useState("");
 
-  const loading = emailLoading || connecting || authLoading;
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormData>({ resolver: zodResolver(loginSchema) });
+
+  const loading = emailLoading || connecting || authLoading || isSubmitting;
 
   const clearAllErrors = () => {
     clearEmailError();
@@ -83,112 +62,39 @@ export default function LoginPage() {
 
   const switchMode = (m: AuthMode) => {
     clearAllErrors();
-    setChallengeRequested(false);
     setMode(m);
   };
 
-  /* ── Wallet auth flow ── */
   const handleWalletAuth = async () => {
     if (!address || !provider) {
       setLocalError("Please connect your wallet first");
-
-      // Telemetry: validation failure
-      const attempt_id = authInstrumentation.submitLogin({
-        auth_method: "wallet",
-        surface: "login_page",
-      });
-      authInstrumentation.loginFailed({
-        auth_method: "wallet",
-        attempt_id,
-        startMs: Date.now(),
-        error: "wallet not connected",
-        failure_stage: "validation",
-        validation_error_count: 1,
-      });
       return;
     }
     clearAllErrors();
-
-    // Telemetry: submit
-    attemptIdRef.current = authInstrumentation.submitLogin({
-      auth_method: "wallet",
-      surface: "login_page",
-    });
-    startMsRef.current = Date.now();
-
     try {
-      await authenticateWithWallet(address, provider, () => {
-        // Telemetry: success (handled in hook/store ideally, but fallback here)
-        authInstrumentation.loginSuccess({
-          auth_method: "wallet",
-          attempt_id: attemptIdRef.current!,
-          startMs: startMsRef.current,
-          had_wallet_connected: true,
-        });
-      });
-    } catch (err) {
-      // Telemetry: failure
-      authInstrumentation.loginFailed({
-        auth_method: "wallet",
-        attempt_id: attemptIdRef.current!,
-        startMs: startMsRef.current,
-        error: err,
-        failure_stage: "response",
-      });
+      await authenticateWithWallet(address, provider, () => {});
+    } catch {
+      // error already set in hook
     }
   };
 
-  // Email auth flow
-  const handleEmailLogin = async () => {
-    if (!email || !password) {
-      setLocalError("Please enter both your email and password");
-
-      // Telemetry: validation failure
-      const attempt_id = authInstrumentation.submitLogin({
-        auth_method: "email",
-        surface: "login_page",
-      });
-      authInstrumentation.loginFailed({
-        auth_method: "email",
-        attempt_id,
-        startMs: Date.now(),
-        error: "missing required fields",
-        failure_stage: "validation",
-        validation_error_count: 2,
-      });
-      return;
-    }
+  const onEmailSubmit = async (data: LoginFormData) => {
     clearAllErrors();
-
-    // Telemetry: submit
-    attemptIdRef.current = authInstrumentation.submitLogin({
-      auth_method: "email",
-      surface: "login_page",
-    });
-    startMsRef.current = Date.now();
-
     try {
-      await emailLogin(email, password);
-      authInstrumentation.loginSuccess({
-        auth_method: "email",
-        attempt_id: attemptIdRef.current!,
-        startMs: startMsRef.current,
-        had_wallet_connected: false,
-      });
-      window.location.href = `/${locale}/creator-dashboard`;
-    } catch (err) {
-      authInstrumentation.loginFailed({
-        auth_method: "email",
-        attempt_id: attemptIdRef.current!,
-        startMs: startMsRef.current,
-        error: err || "not implemented",
-        failure_stage: "request",
-      });
+      await emailLogin(data.email, data.password);
+    } catch (err: unknown) {
+      const { fieldErrors, formError } = mapServerError(err);
+      if (Object.keys(fieldErrors).length > 0) {
+        for (const [field, msg] of Object.entries(fieldErrors)) {
+          setError(field as keyof LoginFormData, { message: msg });
+        }
+      } else {
+        setLocalError(formError);
+      }
     }
   };
 
-  // Safe fallback processing for string structures vs AppApiError definitions
-  const globalErrorInstance = emailStoreError || authError || walletError;
+  const globalErrorInstance = emailError || authError || walletError;
   const globalErrorMessage =
     typeof globalErrorInstance === "string"
       ? globalErrorInstance
@@ -196,17 +102,9 @@ export default function LoginPage() {
 
   const displayGeneralError = localError || globalErrorMessage;
 
-  // Specific nested context extractors for form inputs from your branch
-  const emailFieldError = getValidationFieldMessage(emailStoreError, "email");
-  const passwordFieldError = getValidationFieldMessage(
-    emailStoreError,
-    "password",
-  );
-
   return (
     <div className="min-h-[500px] text-white">
       <CircuitBackground />
-
       <div className="relative z-10 pb-16 px-4">
         <div className="max-w-md mx-auto">
           <div className="border border-purple-500/20 rounded-xl p-8 bg-glass backdrop-blur-md shadow-lg">
@@ -222,17 +120,11 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* General Banner Fallback Notification */}
             {displayGeneralError && (
               <div className="mb-6 p-3 bg-red-900/40 text-red-300 rounded-lg border border-red-500/30 text-sm flex items-start gap-2 animate-fadeIn">
-                <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-red-400" />
                 <div className="flex-1">
-                  <p className="font-medium text-red-200">
-                    Authentication Alert
-                  </p>
-                  <p className="text-xs text-red-300/90 mt-0.5">
-                    {displayGeneralError}
-                  </p>
+                  <p className="font-medium text-red-200">Authentication Alert</p>
+                  <p className="text-xs text-red-300/90 mt-0.5">{displayGeneralError}</p>
                 </div>
               </div>
             )}
@@ -242,9 +134,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => switchMode("wallet")}
                 className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-all ${
-                  mode === "wallet"
-                    ? "bg-gradient-to-r from-[#4e3bff] to-[#9747ff] text-white shadow"
-                    : "text-gray-400 hover:text-white"
+                  mode === "wallet" ? "bg-gradient-to-r from-[#4e3bff] to-[#9747ff] text-white shadow" : "text-gray-400 hover:text-white"
                 }`}
               >
                 <Wallet className="h-4 w-4" />
@@ -254,9 +144,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => switchMode("email")}
                 className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-all ${
-                  mode === "email"
-                    ? "bg-gradient-to-r from-[#4e3bff] to-[#9747ff] text-white shadow"
-                    : "text-gray-400 hover:text-white"
+                  mode === "email" ? "bg-gradient-to-r from-[#4e3bff] to-[#9747ff] text-white shadow" : "text-gray-400 hover:text-white"
                 }`}
               >
                 <Mail className="h-4 w-4" />
@@ -271,7 +159,6 @@ export default function LoginPage() {
                   <label className="block text-sm font-medium mb-2 text-purple-300">
                     {t("login.walletAddress") || "Wallet Address"}
                   </label>
-
                   {connected && address ? (
                     <div className="flex items-center justify-between w-full bg-gray-800/50 border border-purple-500/20 rounded-lg px-4 py-3">
                       <div className="flex items-center gap-2 min-w-0">
@@ -284,10 +171,7 @@ export default function LoginPage() {
                         <WalletNetworkStatus network={defaultNetwork} />
                         <button
                           type="button"
-                          onClick={() => {
-                            disconnect();
-                            setChallengeRequested(false);
-                          }}
+                          onClick={disconnect}
                           className="text-xs text-red-400 hover:text-red-300 transition-colors"
                         >
                           {t("connectWallet.disconnect") || "Disconnect"}
@@ -296,18 +180,12 @@ export default function LoginPage() {
                     </div>
                   ) : (
                     <Input
-                      type="text"
-                      value=""
-                      readOnly
-                      placeholder={
-                        t("login.inputPlaceholder") ||
-                        "Connect wallet to populate"
-                      }
+                      type="text" value="" readOnly
+                      placeholder={t("login.inputPlaceholder") || "Connect wallet to populate"}
                       className="w-full bg-gray-800/50 border border-purple-500/20 rounded-lg px-4 py-3 text-sm"
                     />
                   )}
                 </div>
-
                 <div className="space-y-3">
                   {!connected ? (
                     <Button
@@ -327,23 +205,19 @@ export default function LoginPage() {
                       disabled={loading}
                     >
                       <LogIn className="mr-2 h-5 w-5" />
-                      {loading
-                        ? t("login.signingIn") || "Signing in…"
-                        : t("login.signAndLogin") || "Sign & Login"}
+                      {loading ? t("login.signingIn") || "Signing in…" : t("login.signAndLogin") || "Sign & Login"}
                     </Button>
                   )}
                 </div>
-
                 <p className="text-xs text-gray-500 text-center leading-relaxed">
-                  {t("login.walletAuthNote") ||
-                    "You will be asked to sign a message to verify ownership of your Stellar wallet. No transaction will be submitted."}
+                  {t("login.walletAuthNote") || "You will be asked to sign a message to verify ownership of your Stellar wallet. No transaction will be submitted."}
                 </p>
               </div>
             )}
 
             {/* EMAIL MODE */}
             {mode === "email" && (
-              <div className="space-y-5">
+              <form onSubmit={handleSubmit(onEmailSubmit)} className="space-y-5" noValidate>
                 <div>
                   <label className="block text-sm font-medium mb-2 text-gray-300">
                     {t("login.email") || "Email"}
@@ -352,20 +226,13 @@ export default function LoginPage() {
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
                     <Input
                       type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
                       placeholder="you@example.com"
-                      className={`w-full bg-gray-800/50 border rounded-lg pl-9 pr-4 py-3 text-sm transition-colors ${
-                        emailFieldError
-                          ? "border-red-500 focus-visible:ring-red-500"
-                          : "border-purple-500/20"
-                      }`}
+                      className="w-full bg-gray-800/50 border border-purple-500/20 rounded-lg pl-9 pr-4 py-3 text-sm"
+                      {...register("email")}
                     />
                   </div>
-                  {emailFieldError && (
-                    <p className="text-xs text-red-400 mt-1.5 ml-1 animate-fadeIn font-medium">
-                      {emailFieldError}
-                    </p>
+                  {errors.email && (
+                    <p className="mt-1 text-xs text-red-400">{errors.email.message}</p>
                   )}
                 </div>
 
@@ -377,49 +244,34 @@ export default function LoginPage() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
                     <Input
                       type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      className={`w-full bg-gray-800/50 border rounded-lg pl-9 pr-10 py-3 text-sm transition-colors ${
-                        passwordFieldError
-                          ? "border-red-500 focus-visible:ring-red-500"
-                          : "border-purple-500/20"
-                      }`}
+                      className="w-full bg-gray-800/50 border border-purple-500/20 rounded-lg pl-9 pr-10 py-3 text-sm"
+                      {...register("password")}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
                     >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
-                  {passwordFieldError && (
-                    <p className="text-xs text-red-400 mt-1.5 ml-1 animate-fadeIn font-medium">
-                      {passwordFieldError}
-                    </p>
+                  {errors.password && (
+                    <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>
                   )}
                 </div>
 
                 <Button
-                  type="button"
-                  onClick={handleEmailLogin}
+                  type="submit"
                   className="w-full bg-gradient-to-r from-[#4e3bff] to-[#9747ff] hover:opacity-90 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center"
                   disabled={loading}
                 >
                   <LogIn className="mr-2 h-5 w-5" />
-                  {loading
-                    ? t("login.signingIn") || "Signing in…"
-                    : t("login.signIn") || "Sign In"}
+                  {isSubmitting ? t("login.signingIn") || "Signing in…" : t("login.signIn") || "Sign In"}
                 </Button>
-              </div>
+              </form>
             )}
 
-            {/* Register link */}
             <div className="text-center text-sm text-gray-400 mt-6">
               {t("login.dontHave") || "Don't have an account?"}{" "}
               <Link
@@ -434,11 +286,7 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Wallet selection modal */}
-      <WalletModal
-        open={walletModalOpen}
-        onClose={() => setWalletModalOpen(false)}
-      />
+      <WalletModal open={walletModalOpen} onClose={() => setWalletModalOpen(false)} />
     </div>
   );
 }
