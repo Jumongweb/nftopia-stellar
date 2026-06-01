@@ -49,13 +49,26 @@ const IMAGES = [
 
 async function bootstrap() {
   console.log('Connecting directly to database via TypeORM DataSource...');
-  
-  const dbUrl = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5433/nftopia';
-  
+
+  const dbUrl =
+    process.env.DATABASE_URL ||
+    'postgresql://postgres:postgres@localhost:5433/nftopia';
+
   const dataSource = new DataSource({
     type: 'postgres',
     url: dbUrl,
-    entities: [User, UserWallet, WalletSession, Collection, Nft, NftMetadata, Transaction, Listing, Auction, Bid],
+    entities: [
+      User,
+      UserWallet,
+      WalletSession,
+      Collection,
+      Nft,
+      NftMetadata,
+      Transaction,
+      Listing,
+      Auction,
+      Bid,
+    ],
     synchronize: true,
   });
 
@@ -65,7 +78,6 @@ async function bootstrap() {
   const userRepo = dataSource.getRepository(User);
   const collectionRepo = dataSource.getRepository(Collection);
   const nftRepo = dataSource.getRepository(Nft);
-  const nftMetadataRepo = dataSource.getRepository(NftMetadata);
   const txRepo = dataSource.getRepository(Transaction);
   const listingRepo = dataSource.getRepository(Listing);
   const auctionRepo = dataSource.getRepository(Auction);
@@ -83,7 +95,7 @@ async function bootstrap() {
 
   console.log('Seeding creator and buyer accounts...');
   const passHash = await hashPassword('Password123!');
-  
+
   const creator = userRepo.create({
     id: CREATOR_ID,
     email: 'creator@nftopia.com',
@@ -122,10 +134,12 @@ async function bootstrap() {
   const collections = [
     collectionRepo.create({
       id: COLLECTION_1_ID,
-      contractAddress: 'CC111111111111111111111111111111111111111111111111111111',
+      contractAddress:
+        'CC111111111111111111111111111111111111111111111111111111',
       name: 'Cosmic Horizons',
       symbol: 'COSMIC',
-      description: 'Abstract artistic interpretation of stellar anomalies and intergalactic landscapes.',
+      description:
+        'Abstract artistic interpretation of stellar anomalies and intergalactic landscapes.',
       imageUrl: IMAGES[0],
       bannerImageUrl: IMAGES[1],
       creatorId: CREATOR_ID,
@@ -136,10 +150,12 @@ async function bootstrap() {
     }),
     collectionRepo.create({
       id: COLLECTION_2_ID,
-      contractAddress: 'CC222222222222222222222222222222222222222222222222222222',
+      contractAddress:
+        'CC222222222222222222222222222222222222222222222222222222',
       name: 'Cybernetic Oasis',
       symbol: 'CYBER',
-      description: 'Futuristic geometric mesh artwork reflecting cyberpunk architectures.',
+      description:
+        'Futuristic geometric mesh artwork reflecting cyberpunk architectures.',
       imageUrl: IMAGES[4],
       bannerImageUrl: IMAGES[5],
       creatorId: CREATOR_ID,
@@ -150,10 +166,12 @@ async function bootstrap() {
     }),
     collectionRepo.create({
       id: COLLECTION_3_ID,
-      contractAddress: 'CC333333333333333333333333333333333333333333333333333333',
+      contractAddress:
+        'CC333333333333333333333333333333333333333333333333333333',
       name: 'Abstract Waves',
       symbol: 'WAVES',
-      description: 'Dynamic fluid simulations transformed into bright aesthetic gradient digital pieces.',
+      description:
+        'Dynamic fluid simulations transformed into bright aesthetic gradient digital pieces.',
       imageUrl: IMAGES[8],
       bannerImageUrl: IMAGES[9],
       creatorId: CREATOR_ID,
@@ -214,7 +232,9 @@ async function bootstrap() {
   }
   await nftRepo.save(nfts);
 
-  console.log('Seeding marketplace events (Transactions, Listings, Auctions)...');
+  console.log(
+    'Seeding marketplace events (Transactions, Listings, Auctions)...',
+  );
 
   // Completed transactions
   const txs = [

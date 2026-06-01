@@ -41,7 +41,9 @@ export class UsersController {
     if (!req.user?.userId) {
       throw new UnauthorizedException('Invalid JWT payload');
     }
-    const volume = await this.usersService.getUserTransactionVolume(req.user.userId);
+    const volume = await this.usersService.getUserTransactionVolume(
+      req.user.userId,
+    );
     return {
       data: {
         success: true,

@@ -216,7 +216,9 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Get('list-wallets')
-  @ApiOperation({ summary: 'List linked wallets for current user (frontend alias)' })
+  @ApiOperation({
+    summary: 'List linked wallets for current user (frontend alias)',
+  })
   async listWallets(@Req() req: RequestWithUser) {
     if (!req.user?.userId) {
       throw new UnauthorizedException('Invalid JWT payload');
@@ -227,7 +229,10 @@ export class AuthController {
 
   @Post('wallet-challenge')
   @ApiOperation({ summary: 'Stellar wallet challenge (frontend alias)' })
-  async aliasWalletChallenge(@Body() dto: WalletChallengeDto, @Req() req: Request) {
+  async aliasWalletChallenge(
+    @Body() dto: WalletChallengeDto,
+    @Req() req: Request,
+  ) {
     const res = await this.authService.generateWalletChallenge(dto, req.ip);
     return { data: { success: true, data: res } };
   }
@@ -241,7 +246,10 @@ export class AuthController {
 
   @Post('link-wallet')
   @ApiOperation({ summary: 'Link wallet (frontend alias)' })
-  async aliasLinkWallet(@Req() req: RequestWithUser, @Body() dto: WalletLinkDto) {
+  async aliasLinkWallet(
+    @Req() req: RequestWithUser,
+    @Body() dto: WalletLinkDto,
+  ) {
     if (!req.user?.userId) {
       throw new UnauthorizedException('Invalid JWT payload');
     }
@@ -251,7 +259,10 @@ export class AuthController {
 
   @Post('unlink-wallet')
   @ApiOperation({ summary: 'Unlink wallet (frontend alias)' })
-  async aliasUnlinkWallet(@Req() req: RequestWithUser, @Body() dto: WalletUnlinkDto) {
+  async aliasUnlinkWallet(
+    @Req() req: RequestWithUser,
+    @Body() dto: WalletUnlinkDto,
+  ) {
     if (!req.user?.userId) {
       throw new UnauthorizedException('Invalid JWT payload');
     }
@@ -261,7 +272,10 @@ export class AuthController {
 
   @Post('request-nonce')
   @ApiOperation({ summary: 'Request nonce (frontend alias)' })
-  async aliasRequestNonce(@Body() dto: WalletChallengeDto, @Req() req: Request) {
+  async aliasRequestNonce(
+    @Body() dto: WalletChallengeDto,
+    @Req() req: Request,
+  ) {
     const res = await this.authService.generateWalletChallenge(dto, req.ip);
     return { data: { success: true, data: res } };
   }
