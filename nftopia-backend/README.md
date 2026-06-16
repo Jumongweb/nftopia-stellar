@@ -87,13 +87,11 @@ cd nftopia-backend
 npm install
 cp .env.example .env
 
-# docker-compose.yml reads these values directly
-printf '\nDB_USER=postgres\nDB_PASSWORD=postgres\nDB_NAME=nftopia\nDB_HOST=localhost\nDB_PORT=5433\n' >> .env
+# When the Nest app runs on your host machine, Postgres is exposed on 5433.
+sed -i '' 's/DB_PORT=5432/DB_PORT=5433/' .env
+sed -i '' 's|localhost:5432|localhost:5433|' .env
 
-# match the container port mapping
-sed -i 's|localhost:5432|localhost:5433|' .env
-
-docker compose up -d
+docker compose up -d postgres redis meilisearch
 npm run start:dev
 ```
 
@@ -102,6 +100,41 @@ After startup:
 - REST base: `http://localhost:3000/api/v1`
 - Swagger: `http://localhost:3000/api/docs`
 - GraphQL: `http://localhost:3001/graphql`
+- Health: `http://localhost:3000/health`
+
+### Docker Setup
+
+Build the production image:
+
+```bash
+cd nftopia-backend
+docker build -t nftopia-backend .
+```
+
+Run the image directly:
+
+```bash
+docker run --rm \
+  -p 3000:3000 \
+  -p 3001:3001 \
+  --env-file .env \
+  nftopia-backend
+```
+
+Run the full local stack with dependencies:
+
+```bash
+cd nftopia-backend
+cp .env.example .env
+docker compose up --build
+```
+
+The compose file starts:
+
+- `backend` on ports `3000` and `3001`
+- `postgres` on host port `5433`
+- `redis` on host port `6379`
+- `meilisearch` on host port `7700`
 
 ## ⚙️ Environment Configuration
 
@@ -113,12 +146,13 @@ GRAPHQL_PORT=3001
 NODE_ENV=development
 CORS_ORIGIN=http://localhost:5000
 
+DB_HOST=localhost
+DB_PORT=5432
 DB_USER=postgres
 DB_PASSWORD=postgres
+DB_PASS=postgres
 DB_NAME=nftopia
-DB_HOST=localhost
-DB_PORT=5433
-DATABASE_URL=postgresql://postgres:postgres@localhost:5433/nftopia
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/nftopia
 
 # Database connection pool settings (production defaults)
 DB_POOL_SIZE=20
@@ -142,8 +176,8 @@ STORAGE_FALLBACK_ENABLED=true
 
 Notes:
 
-- `docker-compose.yml` uses `DB_USER`, `DB_PASSWORD`, and `DB_NAME` directly, so those must exist even if `DATABASE_URL` is set.
-- The default example file points PostgreSQL at port `5432`, but the compose file exposes it on `5433`.
+- `docker-compose.yml` uses `DB_PASSWORD` for the PostgreSQL container, while the NestJS app currently reads `DB_PASS`, so keep those values aligned.
+- Inside Docker Compose, the backend connects to `postgres:5432`, `redis:6379`, and `meilisearch:7700`.
 
 ## 🛠️ Available Scripts
 
@@ -198,7 +232,8 @@ nftopia-backend/
 │   ├── services/            # Soroban RPC and Stellar account services
 │   ├── storage/             # IPFS and Arweave adapters
 │   └── users/               # User entity and controller
-├── docker-compose.yml       # Postgres, Redis, Meilisearch
+├── Dockerfile               # Multi-stage image for container deployment
+├── docker-compose.yml       # Backend, Postgres, Redis, Meilisearch
 ├── README-SETUP.md          # Older setup notes
 └── package.json             # Scripts and dependencies
 ```

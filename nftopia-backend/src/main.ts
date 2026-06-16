@@ -30,6 +30,7 @@ import { StellarTimeoutInterceptor } from './interceptors/stellar-timeout.interc
 import { StellarTransformInterceptor } from './interceptors/stellar-transform.interceptor';
 import { SorobanRpcService } from './services/soroban-rpc.service';
 import { StellarAccountService } from './services/stellar-account.service';
+import { HealthService } from './health/health.service';
 
 function createCorsConfig() {
   const customOrigin = process.env.CORS_ORIGIN;
@@ -62,6 +63,7 @@ async function bootstrapRestApi() {
   const stellarAccountService = app.get<StellarAccountService>(
     StellarAccountService,
   );
+  const healthService = app.get<HealthService>(HealthService);
 
   app.useGlobalInterceptors(
     new StellarErrorInterceptor(sorobanRpcService),
@@ -75,6 +77,19 @@ async function bootstrapRestApi() {
   app.useGlobalPipes(createValidationPipe());
 
   app.setGlobalPrefix('api/v1');
+  const healthControllerPath = '/health';
+  const expressApp = app.getHttpAdapter().getInstance() as {
+    get: (
+      path: string,
+      handler: (
+        req: Request,
+        res: Response,
+      ) => Promise<void> | void,
+    ) => void;
+  };
+  expressApp.get(healthControllerPath, async (_req, res) => {
+    res.status(200).json(await healthService.checkLive());
+  });
 
   const config = new DocumentBuilder()
     .setTitle('NFTopia API')

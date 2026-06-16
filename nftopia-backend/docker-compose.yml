@@ -1,6 +1,47 @@
-version: '3.9'
-
 services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: ${NODE_ENV:-production}
+    image: nftopia-backend:latest
+    container_name: nftopia-backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+      - meilisearch
+    ports:
+      - '3000:3000'
+      - '3001:3001'
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${PORT:-3000}
+      GRAPHQL_PORT: ${GRAPHQL_PORT:-3001}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5000}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/nftopia}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASS: ${DB_PASS:-postgres}
+      DB_NAME: ${DB_NAME:-nftopia}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: ${REDIS_DB:-0}
+      CACHE_TTL: ${CACHE_TTL:-300}
+      MEILISEARCH_HOST: http://meilisearch:7700
+      MEILISEARCH_API_KEY: ${MEILISEARCH_API_KEY:-dev-search-key}
+      JWT_SECRET: ${JWT_SECRET:-replace-this-in-production}
+      JWT_EXPIRES_IN_SECONDS: ${JWT_EXPIRES_IN_SECONDS:-900}
+      JWT_REFRESH_EXPIRES_IN_SECONDS: ${JWT_REFRESH_EXPIRES_IN_SECONDS:-604800}
+      SOROBAN_RPC_URL: ${SOROBAN_RPC_URL:-https://soroban-testnet.stellar.org}
+      STELLAR_NETWORK: ${STELLAR_NETWORK:-TESTNET}
+      IPFS_PROVIDER: ${IPFS_PROVIDER:-pinata}
+      IPFS_GATEWAY_URL: ${IPFS_GATEWAY_URL:-https://ipfs.io/ipfs}
+      STORAGE_FALLBACK_ENABLED: ${STORAGE_FALLBACK_ENABLED:-true}
+
   postgres:
     image: postgres:14
     container_name: nftopia-postgres
@@ -8,9 +49,9 @@ services:
     ports:
       - '5433:5432'
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-nftopia}
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
