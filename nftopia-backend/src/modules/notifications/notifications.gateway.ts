@@ -89,7 +89,7 @@ export class NotificationsGateway
 
   afterInit(): void {
     const config = getNotificationsConfig(this.configService);
-    
+
     // Check if server and engine exist before accessing opts
     if (this.server?.engine?.opts) {
       this.server.engine.opts.maxHttpBufferSize =
