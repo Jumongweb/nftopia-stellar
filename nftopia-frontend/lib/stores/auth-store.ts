@@ -46,6 +46,7 @@ export const useAuthStore = create<any>()(
             throw new Error(errorData.message || "Registration failed");
           }
 
+          const result = await res.json();
           const { access_token, refresh_token, user } = result.data.data;
           if (typeof window !== "undefined") {
             sessionStorage.removeItem("auth-user");
@@ -185,6 +186,7 @@ export const useAuthStore = create<any>()(
               errorData.message || "Wallet signature verification failed",
             );
           }
+          const result = await res.json();
           const { access_token, refresh_token, user } = result.data.data;
           if (typeof window !== "undefined") {
             sessionStorage.removeItem("auth-user");
@@ -466,6 +468,7 @@ export const useAuthStore = create<any>()(
             throw new Error(errorData.message || "Verification failed");
           }
 
+          const result = await res.json();
           let user = result.data.data;
           if (typeof window !== "undefined") {
             sessionStorage.removeItem("auth-user");

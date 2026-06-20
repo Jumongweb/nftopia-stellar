@@ -37,6 +37,11 @@ type JwtUserPayload = {
   walletAddress?: string;
 };
 
+type JwtRefreshPayload = {
+  sub: string;
+  type: string;
+};
+
 const scryptAsync = promisify(crypto.scrypt);
 
 @Injectable()
@@ -599,7 +604,7 @@ export class AuthService {
   }
   async refreshTokens(refreshToken: string) {
     try {
-      const payload = this.jwtService.verify(refreshToken);
+      const payload = this.jwtService.verify<JwtRefreshPayload>(refreshToken);
       if (payload.type !== 'refresh') {
         throw new UnauthorizedException('Invalid token type');
       }
