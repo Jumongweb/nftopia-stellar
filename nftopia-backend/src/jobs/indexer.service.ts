@@ -183,19 +183,38 @@ export class IndexerService implements OnModuleInit {
     const tokenId = this.extractTokenId(tx.memo ?? '');
     if (!tokenId) return;
 
+    // Check if NFT already exists
     const existing = await this.nftRepo.findOne({
       where: { contractId, tokenId },
     });
-    if (existing) return;
+    if (!existing) {
+      // Create NFT record
+      const nft = this.nftRepo.create({
+        contractId,
+        tokenId,
+        owner: tx.source_account,
+        mintedAt: new Date(tx.created_at),
+      });
+      await this.nftRepo.save(nft);
+      this.logger.log(`Minted NFT ${contractId}:${tokenId}`);
+    }
 
-    const nft = this.nftRepo.create({
-      contractId,
+    // Create transfer event for mint
+    const transferEvent = this.transferEventRepo.create({
+      nftContractId: contractId,
       tokenId,
-      owner: tx.source_account,
-      mintedAt: new Date(tx.created_at),
+      fromAddress: '0x0000000000000000000000000000000000000000', // Zero address for mint
+      toAddress: tx.source_account,
+      transactionHash: tx.hash,
+      eventType: NftTransferEventType.MINT,
+      currency: 'XLM',
+      ledgerSequence: tx.ledger_attr ?? 0,
+      timestamp: new Date(tx.created_at).getTime(),
+      memo: tx.memo ?? undefined,
     });
-    await this.nftRepo.save(nft);
-    this.logger.log(`Minted NFT ${contractId}:${tokenId}`);
+
+    await this.transferEventRepo.save(transferEvent);
+    this.logger.log(`Transfer event saved for mint ${contractId}:${tokenId}`);
   }
 
   private async handleSale(
@@ -206,11 +225,39 @@ export class IndexerService implements OnModuleInit {
     if (!tokenId) return;
 
     const nft = await this.nftRepo.findOne({ where: { contractId, tokenId } });
-    if (!nft) return;
+    if (!nft) {
+      this.logger.warn(`NFT ${contractId}:${tokenId} not found for sale event`);
+      return;
+    }
 
+    // Update sales count
     nft.salesCount = (nft.salesCount ?? 0) + 1;
     await this.nftRepo.save(nft);
-    this.logger.log(`Sale recorded for NFT ${contractId}:${tokenId}`);
+
+    // Extract price from memo or metadata
+    const price = this.extractPriceFromMemo(tx.memo ?? '');
+
+    // Create transfer event for sale
+    const transferEvent = this.transferEventRepo.create({
+      nftContractId: contractId,
+      tokenId,
+      fromAddress: nft.owner, // Previous owner
+      toAddress: tx.source_account, // New owner (buyer)
+      transactionHash: tx.hash,
+      eventType: NftTransferEventType.SALE,
+      price: price || undefined,
+      currency: 'XLM',
+      ledgerSequence: tx.ledger_attr ?? 0,
+      timestamp: new Date(tx.created_at).getTime(),
+      memo: tx.memo ?? undefined,
+    });
+
+    await this.transferEventRepo.save(transferEvent);
+    this.logger.log(`Transfer event saved for sale ${contractId}:${tokenId}`);
+
+    // Update NFT owner
+    nft.owner = tx.source_account;
+    await this.nftRepo.save(nft);
   }
 
   private async handleTransfer(
@@ -221,15 +268,44 @@ export class IndexerService implements OnModuleInit {
     if (!tokenId) return;
 
     const nft = await this.nftRepo.findOne({ where: { contractId, tokenId } });
-    if (!nft) return;
+    if (!nft) {
+      this.logger.warn(
+        `NFT ${contractId}:${tokenId} not found for transfer event`,
+      );
+      return;
+    }
 
+    // Create transfer event
+    const transferEvent = this.transferEventRepo.create({
+      nftContractId: contractId,
+      tokenId,
+      fromAddress: nft.owner,
+      toAddress: tx.source_account,
+      transactionHash: tx.hash,
+      eventType: NftTransferEventType.TRANSFER,
+      currency: 'XLM',
+      ledgerSequence: tx.ledger_attr ?? 0,
+      timestamp: new Date(tx.created_at).getTime(),
+      memo: tx.memo ?? undefined,
+    });
+
+    await this.transferEventRepo.save(transferEvent);
+    this.logger.log(
+      `Transfer event saved for transfer ${contractId}:${tokenId}`,
+    );
+
+    // Update NFT owner
     nft.owner = tx.source_account;
     await this.nftRepo.save(nft);
-    this.logger.log(`Transfer recorded for NFT ${contractId}:${tokenId}`);
   }
 
   private extractTokenId(memo: string): string | null {
     const match = memo.match(/token[_-]?id[:\s=]+([A-Za-z0-9]+)/i);
+    return match ? match[1] : null;
+  }
+
+  private extractPriceFromMemo(memo: string): string | null {
+    const match = memo.match(/price[:\s=]+([0-9.]+)/i);
     return match ? match[1] : null;
   }
 
