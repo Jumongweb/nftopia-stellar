@@ -5,6 +5,10 @@ import { Horizon } from 'stellar-sdk';
 import { SystemSettings } from './system-settings.entity';
 import { StellarNft } from '../nft/entities/stellar-nft.entity';
 import { ContractEventDlq } from './entities/contract-event-dlq.entity';
+import {
+  NftTransferEvent,
+  NftTransferEventType,
+} from './entities/nft-transfer-event.entity';
 import { SchemaReadinessService } from '../database/schema-readiness.service';
 
 const LAST_LEDGER_KEY = 'last_ingested_ledger';
@@ -25,6 +29,8 @@ export class IndexerService implements OnModuleInit {
     private readonly nftRepo: Repository<StellarNft>,
     @InjectRepository(ContractEventDlq)
     private readonly dlqRepo: Repository<ContractEventDlq>,
+    @InjectRepository(NftTransferEvent)
+    private readonly transferEventRepo: Repository<NftTransferEvent>,
     private readonly schemaReadinessService: SchemaReadinessService,
   ) {}
 
