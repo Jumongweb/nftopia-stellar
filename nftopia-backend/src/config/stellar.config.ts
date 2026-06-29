@@ -10,6 +10,10 @@ export type StellarRuntimeConfig = {
   submissionTimeoutMs: number;
   loggingLevel: 'debug' | 'info';
   obfuscateSensitiveErrors: boolean;
+  sorobanRpcMaxRetries: number;
+  sorobanRpcRetryDelayMs: number;
+  sorobanRpcRetryBackoffMultiplier: number;
+  sorobanRpcRetryMaxDelayMs: number;
 };
 
 function asInt(value: string | undefined, fallback: number): number {
@@ -144,6 +148,16 @@ export function getStellarConfig(
     obfuscateSensitiveErrors: asBool(
       env.STELLAR_OBFUSCATE_SENSITIVE_ERRORS,
       env.NODE_ENV === 'production',
+    ),
+    sorobanRpcMaxRetries: asInt(env.SOROBAN_RPC_MAX_RETRIES, 3),
+    sorobanRpcRetryDelayMs: asInt(env.SOROBAN_RPC_RETRY_DELAY_MS, 1_000),
+    sorobanRpcRetryBackoffMultiplier: asInt(
+      env.SOROBAN_RPC_RETRY_BACKOFF_MULTIPLIER,
+      2,
+    ),
+    sorobanRpcRetryMaxDelayMs: asInt(
+      env.SOROBAN_RPC_RETRY_MAX_DELAY_MS,
+      30_000,
     ),
   };
 }
