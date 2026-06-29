@@ -21,6 +21,10 @@ import {
   StrKey,
 } from 'stellar-sdk';
 import { Server as SorobanServer, assembleTransaction } from 'stellar-sdk/rpc';
+import {
+  calculateExponentialBackoffDelayMs,
+  SorobanRpcService,
+} from '../../services/soroban-rpc.service';
 
 type SorobanArgType =
   | 'address'
@@ -60,7 +64,10 @@ export type InvokeContractResult = {
 export class SorobanService {
   private readonly logger = new Logger(SorobanService.name);
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly sorobanRpcService: SorobanRpcService,
+  ) {}
 
   async invokeContract(
     contractId: string,
@@ -120,7 +127,9 @@ export class SorobanService {
     const timeoutSeconds = this.getTransactionTimeoutSeconds();
 
     try {
-      const account = await server.getAccount(source);
+      const account = await this.withRpcRetry('getAccount', () =>
+        server.getAccount(source),
+      );
       const contract = new Contract(contractId);
       const operation = contract.call(
         method,
@@ -135,7 +144,9 @@ export class SorobanService {
         .setTimeout(timeoutSeconds)
         .build();
 
-      const simulationResult = await server.simulateTransaction(tx);
+      const simulationResult = await this.withRpcRetry('simulateTransaction', () =>
+        server.simulateTransaction(tx),
+      );
 
       if ('error' in (simulationResult as { error?: string })) {
         throw new BadRequestException(
@@ -168,57 +179,45 @@ export class SorobanService {
       );
     }
 
-    const maxAttempts = 3;
-    let lastError: unknown;
+    try {
+      const server = this.createRpcServer();
+      const networkPassphrase = this.getNetworkPassphrase();
+      const keypair = Keypair.fromSecret(signer);
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      try {
-        const server = this.createRpcServer();
-        const networkPassphrase = this.getNetworkPassphrase();
-        const keypair = Keypair.fromSecret(signer);
+      const unsignedTx = TransactionBuilder.fromXDR(
+        tx.transactionXdr,
+        networkPassphrase,
+      ) as Transaction;
 
-        const unsignedTx = TransactionBuilder.fromXDR(
-          tx.transactionXdr,
-          networkPassphrase,
-        ) as Transaction;
+      const assembled = assembleTransaction(
+        unsignedTx,
+        tx.simulationResult as never,
+      ).build();
 
-        const assembled = assembleTransaction(
-          unsignedTx,
-          tx.simulationResult as never,
-        ).build();
+      assembled.sign(keypair);
+      const sendResult = await this.withRpcRetry('sendTransaction', () =>
+        server.sendTransaction(assembled),
+      );
 
-        assembled.sign(keypair);
-        const sendResult = await server.sendTransaction(assembled);
-
-        if (sendResult.status === 'ERROR') {
-          throw new BadRequestException(
-            `Soroban submission error: ${JSON.stringify(sendResult.errorResult ?? {})}`,
-          );
-        }
-
-        const finalized = await this.pollTransactionResult(
-          server,
-          sendResult.hash,
+      if (sendResult.status === 'ERROR') {
+        throw new BadRequestException(
+          `Soroban submission error: ${JSON.stringify(sendResult.errorResult ?? {})}`,
         );
-
-        this.logger.log(
-          `Audit tx submitted: hash=${sendResult.hash} status=${finalized.status}`,
-        );
-
-        return finalized;
-      } catch (error) {
-        lastError = error;
-
-        if (attempt === maxAttempts) {
-          break;
-        }
-
-        const backoffMs = 500 * Math.pow(2, attempt - 1);
-        await new Promise<void>((resolve) => setTimeout(resolve, backoffMs));
       }
-    }
 
-    throw this.mapSorobanError(lastError);
+      const finalized = await this.pollTransactionResult(
+        server,
+        sendResult.hash,
+      );
+
+      this.logger.log(
+        `Audit tx submitted: hash=${sendResult.hash} status=${finalized.status}`,
+      );
+
+      return finalized;
+    } catch (error) {
+      throw this.mapSorobanError(error);
+    }
   }
 
   ensureValidAccountAddress(address: string): void {
@@ -334,9 +333,23 @@ export class SorobanService {
     server: SorobanServer,
     hash: string,
   ): Promise<SubmitTransactionResult> {
-    for (let i = 0; i < 10; i += 1) {
-      await new Promise<void>((resolve) => setTimeout(resolve, 1500));
-      const txResult = (await server.getTransaction(hash)) as {
+    const retryConfig = this.sorobanRpcService.getRuntimeConfig();
+    const maxPollAttempts = 10;
+
+    for (let i = 0; i < maxPollAttempts; i += 1) {
+      if (i > 0) {
+        const pollDelayMs = calculateExponentialBackoffDelayMs(
+          i,
+          retryConfig.sorobanRpcRetryDelayMs,
+          retryConfig.sorobanRpcRetryBackoffMultiplier,
+          retryConfig.sorobanRpcRetryMaxDelayMs,
+        );
+        await new Promise<void>((resolve) => setTimeout(resolve, pollDelayMs));
+      }
+
+      const txResult = (await this.withRpcRetry('getTransaction', () =>
+        server.getTransaction(hash),
+      )) as {
         status?: string;
         ledger?: number;
         returnValue?: unknown;
@@ -363,6 +376,13 @@ export class SorobanService {
     throw new GatewayTimeoutException(
       `Timed out waiting for transaction finalization: ${hash}`,
     );
+  }
+
+  private withRpcRetry<T>(
+    methodName: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    return this.sorobanRpcService.retryRpcCall(operation, methodName);
   }
 
   private mapSorobanError(error: unknown): Error {
